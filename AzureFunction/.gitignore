@@ -50,3 +50,19 @@ __queuestorage__
 __tablestorage__/
 __azurite_db*__.json
 AzuriteConfig
+# Local Azure Functions settings and secrets
+AzureFunction/local.settings.json
+
+# Python local files
+AzureFunction/.venv/
+AzureFunction/__pycache__/
+AzureFunction/.ruff_cache/
+*.pyc
+
+# Local emulators
+azurite-data/
+azurite-phase3/
+azurite-phase3-v2/
+
+# Local test data
+All_Diets_v2.csv
