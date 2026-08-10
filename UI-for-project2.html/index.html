@@ -9,11 +9,25 @@
       href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.0/dist/tailwind.min.css"
       rel="stylesheet"
     />
+    <script>
+      // Runs before the page renders to keep unauthenticated users off this page.
+      if (!localStorage.getItem("authToken")) {
+        window.location.replace("authentication/login.html");
+      }
+    </script>
   </head>
   <body class="bg-gray-100">
-    <header class="bg-blue-600 p-4 text-white">
+    <header class="bg-blue-600 p-4 text-white flex justify-between items-center">
       <h1 class="text-3xl font-semibold">Nutritional Insights</h1>
+      <span id="userNameDisplay" class="text-sm font-medium"></span>
     </header>
+
+    <script>
+      document.getElementById("userNameDisplay").textContent =
+        localStorage.getItem("userName") ||
+        localStorage.getItem("userEmail") ||
+        "";
+    </script>
 
     <main class="container mx-auto p-6">
       <section class="mb-8">

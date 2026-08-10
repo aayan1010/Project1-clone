@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Register - Nutritional Insights</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.0/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-gray-100">
+    <header class="bg-blue-600 p-4 text-white">
+      <h1 class="text-3xl font-semibold">Nutritional Insights</h1>
+    </header>
+
+    <main class="container mx-auto p-6 flex justify-center">
+      <div class="bg-white p-8 shadow-lg rounded-lg w-full max-w-md">
+        <h2 class="text-2xl font-semibold mb-6">Create an Account</h2>
+
+        <div
+          id="messageBox"
+          class="hidden mb-4 p-3 rounded text-sm"
+        ></div>
+
+        <form id="registerForm" class="space-y-4">
+          <div>
+            <label for="name" class="block text-sm font-medium text-gray-700"
+              >Name</label
+            >
+            <input
+              id="name"
+              type="text"
+              required
+              class="mt-1 p-2 border rounded w-full"
+              autocomplete="name"
+            />
+          </div>
+          
+          <div>
+            <label for="email" class="block text-sm font-medium text-gray-700"
+              >Email</label
+            >
+            <input
+              id="email"
+              type="email"
+              required
+              class="mt-1 p-2 border rounded w-full"
+              autocomplete="email"
+            />
+          </div>
+
+          <div>
+            <label
+              for="password"
+              class="block text-sm font-medium text-gray-700"
+              >Password</label
+            >
+            <input
+              id="password"
+              type="password"
+              required
+              minlength="8"
+              class="mt-1 p-2 border rounded w-full"
+              autocomplete="new-password"
+            />
+            <p class="text-xs text-gray-500 mt-1">
+              Password must be at least 8 characters.
+            </p>
+          </div>
+
+          <div>
+            <label
+              for="confirmPassword"
+              class="block text-sm font-medium text-gray-700"
+              >Confirm Password</label
+            >
+            <input
+              id="confirmPassword"
+              type="password"
+              required
+              minlength="8"
+              class="mt-1 p-2 border rounded w-full"
+              autocomplete="new-password"
+            />
+          </div>
+
+          <button
+            id="submitButton"
+            type="submit"
+            class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
+          >
+            Register
+          </button>
+        </form>
+
+        <p class="text-sm text-gray-600 mt-6 text-center">
+          Already have an account?
+          <a
+            href="login.html"
+            class="text-blue-600 hover:underline font-medium"
+            >Login here</a
+          >
+        </p>
+      </div>
+    </main>
+
+    <script>
+      // Registration API only stores a bcrypt hash of the password server-side.
+      const API_BASE_URL = "https://diet-analysis-app-docker-gqaea8h7g7ahhdcf.eastus-01.azurewebsites.net/api";
+      
+      const registerForm = document.getElementById("registerForm");
+      const messageBox = document.getElementById("messageBox");
+      const submitButton = document.getElementById("submitButton");
+
+      function showMessage(text, isError) {
+        messageBox.textContent = text;
+        messageBox.classList.remove(
+          "hidden",
+          "bg-red-100",
+          "text-red-700",
+          "bg-green-100",
+          "text-green-700"
+        );
+        messageBox.classList.add(
+          isError ? "bg-red-100" : "bg-green-100",
+          isError ? "text-red-700" : "text-green-700"
+        );
+      }
+
+      registerForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const name = document.getElementById("name").value.trim();
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
+        const confirmPassword =
+          document.getElementById("confirmPassword").value;
+
+        if (password !== confirmPassword) {
+          showMessage("Passwords do not match.", true);
+          return;
+        }
+
+        if (password.length < 8) {
+          showMessage(
+            "Password must be at least 8 characters.",
+            true
+          );
+          return;
+        }
+
+        submitButton.disabled = true;
+        submitButton.textContent = "Registering...";
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/Register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, email, password }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            showMessage(data.error || "Registration failed.", true);
+            return;
+          }
+
+          showMessage(
+            "Registered successfully. Redirecting to login...",
+            false
+          );
+
+          setTimeout(() => {
+            window.location.href = "login.html";
+          }, 1500);
+        } catch (error) {
+          showMessage("Network error. Please try again.", true);
+        } finally {
+          submitButton.disabled = false;
+          submitButton.textContent = "Register";
+        }
+      });
+
+    </script>
+  </body>
+</html>
