@@ -12,6 +12,7 @@ import azure.functions as func
 import bcrypt
 import jwt
 import pandas as pd
+import requests
 from azure.cosmos import CosmosClient, PartitionKey, exceptions
 from azure.storage.blob import BlobServiceClient
 
@@ -32,6 +33,12 @@ USERS_CONTAINER_NAME = "Users"
 
 # JWT secret is loaded from local.settings.json or Azure App Settings.
 JWT_SECRET = os.environ.get("JWT_SECRET", "")
+
+# GitHub OAuth configuration. The Client Secret is never hardcoded here —
+# both values are read from Azure App Settings (Environment variables)
+# at runtime, the same way COSMOS_CONNECTION_STRING is loaded above.
+GITHUB_CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID", "")
+GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "")
 
 
 def json_response(data, status_code=200):
@@ -778,6 +785,188 @@ def Login(req: func.HttpRequest) -> func.HttpResponse:
 
     except Exception as error:
         logging.exception("Login failed")
+
+        return json_response(
+            {"error": str(error)},
+            500,
+        )
+
+
+@app.route(
+    route="GitHubCallback",
+    methods=["GET"],
+    auth_level=func.AuthLevel.ANONYMOUS,
+)
+def GitHubCallback(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Handle the GitHub OAuth redirect.
+
+    GitHub sends the user back here with a temporary `code` after
+    they approve access. This function exchanges that code for an
+    access token, fetches the user's GitHub profile, creates or
+    finds a matching user in Cosmos DB, and returns a signed JWT
+    the same way the password-based Login route does.
+    """
+    try:
+        if not GITHUB_CLIENT_ID or not GITHUB_CLIENT_SECRET:
+            raise ValueError(
+                "GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET "
+                "are not configured"
+            )
+
+        code = req.params.get("code")
+
+        if not code:
+            return json_response(
+                {"error": "Missing 'code' parameter"},
+                400,
+            )
+
+        # Exchange the temporary code for an access token.
+        # This call must happen server-side — it's the one place
+        # the Client Secret is ever used, and it never leaves
+        # this function.
+        token_response = requests.post(
+            "https://github.com/login/oauth/access_token",
+            headers={"Accept": "application/json"},
+            data={
+                "client_id": GITHUB_CLIENT_ID,
+                "client_secret": GITHUB_CLIENT_SECRET,
+                "code": code,
+            },
+            timeout=10,
+        )
+
+        token_response.raise_for_status()
+        token_data = token_response.json()
+
+        access_token = token_data.get("access_token")
+
+        if not access_token:
+            return json_response(
+                {
+                    "error": token_data.get(
+                        "error_description",
+                        "Failed to obtain access token from GitHub",
+                    )
+                },
+                401,
+            )
+
+        # Fetch the authenticated user's GitHub profile.
+        profile_response = requests.get(
+            "https://api.github.com/user",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/vnd.github+json",
+            },
+            timeout=10,
+        )
+
+        profile_response.raise_for_status()
+        profile = profile_response.json()
+
+        github_id = str(profile.get("id", ""))
+        name = profile.get("name") or profile.get("login", "")
+        email = profile.get("email")
+
+        # GitHub only returns a public email if the user has one set.
+        # Fall back to the emails endpoint to find a primary email.
+        if not email:
+            emails_response = requests.get(
+                "https://api.github.com/user/emails",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/vnd.github+json",
+                },
+                timeout=10,
+            )
+
+            if emails_response.ok:
+                for entry in emails_response.json():
+                    if entry.get("primary"):
+                        email = entry.get("email")
+                        break
+
+        if not email:
+            email = f"{github_id}@users.noreply.github.com"
+
+        email = email.strip().lower()
+
+        users_container = get_cosmos_container(
+            USERS_CONTAINER_NAME
+        )
+
+        # Look for an existing account linked to this GitHub ID.
+        existing_users = list(
+            users_container.query_items(
+                query=(
+                    "SELECT * FROM c "
+                    "WHERE c.github_id = @github_id"
+                ),
+                parameters=[
+                    {
+                        "name": "@github_id",
+                        "value": github_id,
+                    }
+                ],
+                enable_cross_partition_query=True,
+            )
+        )
+
+        if existing_users:
+            user = existing_users[0]
+        else:
+            user = {
+                "id": str(uuid.uuid4()),
+                "email": email,
+                "name": name,
+                "github_id": github_id,
+                "provider": "github",
+                "created_at": datetime.datetime.now(
+                    datetime.timezone.utc
+                ).isoformat(),
+            }
+
+            users_container.create_item(user)
+
+        if not JWT_SECRET:
+            raise ValueError(
+                "JWT_SECRET is not configured"
+            )
+
+        token = jwt.encode(
+            {
+                "sub": user["id"],
+                "email": user["email"],
+                "name": user.get("name", ""),
+                "exp": datetime.datetime.now(
+                    datetime.timezone.utc
+                )
+                + datetime.timedelta(hours=8),
+            },
+            JWT_SECRET,
+            algorithm="HS256",
+        )
+
+        return json_response(
+            {
+                "token": token,
+                "name": user.get("name", ""),
+                "email": user["email"],
+            }
+        )
+
+    except requests.RequestException as error:
+        logging.exception("GitHub OAuth request failed")
+
+        return json_response(
+            {"error": f"GitHub request failed: {error}"},
+            502,
+        )
+
+    except Exception as error:
+        logging.exception("GitHubCallback failed")
 
         return json_response(
             {"error": str(error)},
