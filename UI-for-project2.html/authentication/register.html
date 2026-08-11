@@ -107,7 +107,10 @@
 
     <script>
       // Registration API only stores a bcrypt hash of the password server-side.
-      const API_BASE_URL = "https://diet-analysis-app-docker-gqaea8h7g7ahhdcf.eastus-01.azurewebsites.net/api";
+      // Relative URL — this page is served by the same Static Web App
+      // that hosts the managed Function backend, so /api routes to it
+      // automatically (no CORS, no hardcoded hostname).
+      const API_BASE_URL = "/api";
       
       const registerForm = document.getElementById("registerForm");
       const messageBox = document.getElementById("messageBox");

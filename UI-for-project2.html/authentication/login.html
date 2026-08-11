@@ -100,7 +100,10 @@
     </main>
 
     <script>
-      const API_BASE_URL = "https://diet-analysis-app-docker-gqaea8h7g7ahhdcf.eastus-01.azurewebsites.net/api";
+      // Relative URL — this page is served by the same Static Web App
+      // that hosts the managed Function backend, so /api routes to it
+      // automatically (no CORS, no hardcoded hostname).
+      const API_BASE_URL = "/api";
 
       // Register this app's OAuth App on GitHub and paste its Client ID here.
       // The Client Secret stays server-side only (see AzureFunction/function_app.py).
