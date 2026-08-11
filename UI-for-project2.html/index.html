@@ -183,10 +183,11 @@
 
     <!-- Custom JavaScript Engine -->
     <script>
-      const apiUrl =
-        "https://diet-analysis-app-docker-gqaea8h7g7ahhdcf.eastus-01.azurewebsites.net/api/GetDietAnalysis";
-      const recipesApiUrl =
-        "https://diet-analysis-app-docker-gqaea8h7g7ahhdcf.eastus-01.azurewebsites.net/api/GetRecipes";
+      // Relative URL — this page is served by the same Static Web App
+      // that hosts the managed Function backend, so /api routes to it
+      // automatically (no CORS, no hardcoded hostname).
+      const apiUrl = "/api/GetDietAnalysis";
+      const recipesApiUrl = "/api/GetRecipes";
 
       // Initialize chart instance variables
       let barChart = null;
