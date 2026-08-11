@@ -117,7 +117,7 @@
           <button class="bg-blue-600 text-white py-2 px-4 rounded">
             Get Nutritional Insights
           </button>
-          <button class="bg-green-600 text-white py-2 px-4 rounded">
+          <button id="getRecipesBtn" class="bg-green-600 text-white py-2 px-4 rounded">
             Get Recipes
           </button>
           <button class="bg-purple-600 text-white py-2 px-4 rounded">
@@ -126,17 +126,49 @@
         </div>
       </section>
 
+      <section class="mb-8">
+        <h2 class="text-2xl font-semibold mb-4">Recipe Results</h2>
+        <div class="bg-white shadow-lg rounded-lg overflow-x-auto">
+          <table class="min-w-full text-sm text-left">
+            <thead class="bg-gray-100">
+              <tr>
+                <th class="p-2">Recipe Name</th>
+                <th class="p-2">Diet Type</th>
+                <th class="p-2">Cuisine</th>
+                <th class="p-2">Protein (g)</th>
+                <th class="p-2">Carbs (g)</th>
+                <th class="p-2">Fat (g)</th>
+              </tr>
+            </thead>
+            <tbody id="recipeResultsBody">
+              <tr>
+                <td class="p-2 text-gray-500" colspan="6">
+                  Click "Get Recipes" to load results.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section>
         <h2 class="text-2xl font-semibold mb-4">Pagination</h2>
-        <div class="flex justify-center gap-2 mt-4">
-          <button class="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400">
+        <div class="flex justify-center items-center gap-2 mt-4">
+          <button
+            id="prevPageBtn"
+            class="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled
+          >
             Previous
           </button>
-          <button class="px-3 py-1 bg-blue-600 text-white rounded">1</button>
-          <button class="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400">
-            2
-          </button>
-          <button class="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400">
+          <span id="pageIndicator" class="text-sm text-gray-700 px-2"
+            >Page 1 of 1</span
+          >
+          <button
+            id="nextPageBtn"
+            class="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled
+          >
             Next
           </button>
         </div>
@@ -153,6 +185,8 @@
     <script>
       const apiUrl =
         "https://diet-analysis-app-docker-gqaea8h7g7ahhdcf.eastus-01.azurewebsites.net/api/GetDietAnalysis";
+      const recipesApiUrl =
+        "https://diet-analysis-app-docker-gqaea8h7g7ahhdcf.eastus-01.azurewebsites.net/api/GetRecipes";
 
       // Initialize chart instance variables
       let barChart = null;
@@ -165,6 +199,92 @@
       );
       const dietFilter = document.getElementById("dietFilter");
       const dietSearchInput = document.getElementById("dietSearchInput");
+
+      // Recipe results table + pagination controls
+      const getRecipesBtn = document.getElementById("getRecipesBtn");
+      const recipeResultsBody = document.getElementById("recipeResultsBody");
+      const prevPageBtn = document.getElementById("prevPageBtn");
+      const nextPageBtn = document.getElementById("nextPageBtn");
+      const pageIndicator = document.getElementById("pageIndicator");
+      const recipesPageSize = 10;
+      let currentRecipesPage = 1;
+      let totalRecipesPages = 1;
+
+      // Reuse the same diet filter/search logic as the insights request.
+      function getActiveDietFilter() {
+        const selectedDiet = (dietFilter?.value || "all").trim().toLowerCase();
+        const typedDiet = (dietSearchInput?.value || "").trim().toLowerCase();
+        return typedDiet || (selectedDiet === "all" ? "" : selectedDiet);
+      }
+
+      async function loadRecipes(page) {
+        try {
+          getRecipesBtn.disabled = true;
+          getRecipesBtn.textContent = "Loading...";
+
+          const requestUrl = new URL(recipesApiUrl);
+          const dietType = getActiveDietFilter();
+          if (dietType) {
+            requestUrl.searchParams.set("diet_type", dietType);
+          }
+          requestUrl.searchParams.set("page", page);
+          requestUrl.searchParams.set("page_size", recipesPageSize);
+
+          const response = await fetch(requestUrl.toString());
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || "Failed to load recipes.");
+          }
+
+          currentRecipesPage = data.page;
+          totalRecipesPages = data.total_pages;
+
+          recipeResultsBody.innerHTML = data.recipes.length
+            ? data.recipes
+                .map(
+                  (recipe) => `
+                    <tr class="border-t">
+                      <td class="p-2">${recipe.Recipe_name}</td>
+                      <td class="p-2">${recipe.Diet_type}</td>
+                      <td class="p-2">${recipe.Cuisine_type}</td>
+                      <td class="p-2">${Number(recipe["Protein(g)"]).toFixed(1)}</td>
+                      <td class="p-2">${Number(recipe["Carbs(g)"]).toFixed(1)}</td>
+                      <td class="p-2">${Number(recipe["Fat(g)"]).toFixed(1)}</td>
+                    </tr>
+                  `,
+                )
+                .join("")
+            : '<tr><td class="p-2 text-gray-500" colspan="6">No recipes found.</td></tr>';
+
+          pageIndicator.textContent = `Page ${totalRecipesPages === 0 ? 0 : currentRecipesPage} of ${totalRecipesPages}`;
+          prevPageBtn.disabled = currentRecipesPage <= 1;
+          nextPageBtn.disabled = currentRecipesPage >= totalRecipesPages;
+        } catch (error) {
+          console.error("Error fetching recipes:", error);
+          recipeResultsBody.innerHTML =
+            '<tr><td class="p-2 text-red-600" colspan="6">Failed to load recipes.</td></tr>';
+        } finally {
+          getRecipesBtn.disabled = false;
+          getRecipesBtn.textContent = "Get Recipes";
+        }
+      }
+
+      getRecipesBtn.addEventListener("click", () => {
+        loadRecipes(1);
+      });
+
+      prevPageBtn.addEventListener("click", () => {
+        if (currentRecipesPage > 1) {
+          loadRecipes(currentRecipesPage - 1);
+        }
+      });
+
+      nextPageBtn.addEventListener("click", () => {
+        if (currentRecipesPage < totalRecipesPages) {
+          loadRecipes(currentRecipesPage + 1);
+        }
+      });
 
       // Allows us to remove existing chart instances so that it can create new charts. Called before creating a new chart when calling the api.
       function destroyChart(chartInstance) {
