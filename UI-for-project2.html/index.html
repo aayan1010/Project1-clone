@@ -95,9 +95,9 @@
         </h2>
         <div class="flex flex-wrap gap-4">
           <input
-            id="dietSearchInput"
+            id="recipeKeywordInput"
             type="text"
-            placeholder="Search by Diet Type"
+            placeholder="Search Recipes by Name"
             class="p-2 border rounded w-full sm:w-auto"
           />
           <select id="dietFilter" class="p-2 border rounded w-full sm:w-auto">
@@ -199,7 +199,7 @@
         "button.bg-blue-600.text-white",
       );
       const dietFilter = document.getElementById("dietFilter");
-      const dietSearchInput = document.getElementById("dietSearchInput");
+      const recipeKeywordInput = document.getElementById("recipeKeywordInput");
 
       // Recipe results table + pagination controls
       const getRecipesBtn = document.getElementById("getRecipesBtn");
@@ -211,11 +211,9 @@
       let currentRecipesPage = 1;
       let totalRecipesPages = 1;
 
-      // Reuse the same diet filter/search logic as the insights request.
-      function getActiveDietFilter() {
+      function getSelectedDietType() {
         const selectedDiet = (dietFilter?.value || "all").trim().toLowerCase();
-        const typedDiet = (dietSearchInput?.value || "").trim().toLowerCase();
-        return typedDiet || (selectedDiet === "all" ? "" : selectedDiet);
+        return selectedDiet === "all" ? "" : selectedDiet;
       }
 
       async function loadRecipes(page) {
@@ -223,10 +221,14 @@
           getRecipesBtn.disabled = true;
           getRecipesBtn.textContent = "Loading...";
 
-          const requestUrl = new URL(recipesApiUrl);
-          const dietType = getActiveDietFilter();
+          const requestUrl = new URL(recipesApiUrl, window.location.origin);
+          const dietType = getSelectedDietType();
+          const keyword = (recipeKeywordInput?.value || "").trim();
           if (dietType) {
             requestUrl.searchParams.set("diet_type", dietType);
+          }
+          if (keyword) {
+            requestUrl.searchParams.set("keyword", keyword);
           }
           requestUrl.searchParams.set("page", page);
           requestUrl.searchParams.set("page_size", recipesPageSize);
@@ -300,9 +302,7 @@
           // Change button text to show it is loading
           insightsBtn.textContent = "Loading Data from Cloud...";
 
-          const selectedDiet = (dietFilter?.value || "all").trim().toLowerCase();
-          const typedDiet = (dietSearchInput?.value || "").trim().toLowerCase();
-          const filterValue = typedDiet || (selectedDiet === "all" ? "" : selectedDiet);
+          const filterValue = getSelectedDietType();
           const requestUrl = filterValue
             ? `${apiUrl}?diet_type=${encodeURIComponent(filterValue)}`
             : apiUrl;
