@@ -19,7 +19,16 @@
   <body class="bg-gray-100">
     <header class="bg-blue-600 p-4 text-white flex justify-between items-center">
       <h1 class="text-3xl font-semibold">Nutritional Insights</h1>
-      <span id="userNameDisplay" class="text-sm font-medium"></span>
+      <div class="flex items-center gap-4">
+        <span id="userNameDisplay" class="text-sm font-medium"></span>
+        <button
+          id="logoutButton"
+          type="button"
+          class="bg-blue-700 hover:bg-blue-800 text-sm font-medium px-3 py-1 rounded"
+        >
+          Log Out
+        </button>
+      </div>
     </header>
 
     <script>
@@ -27,6 +36,13 @@
         localStorage.getItem("userName") ||
         localStorage.getItem("userEmail") ||
         "";
+
+      document.getElementById("logoutButton").addEventListener("click", () => {
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("userEmail");
+        localStorage.removeItem("userName");
+        window.location.href = "authentication/login.html";
+      });
     </script>
 
     <main class="container mx-auto p-6">
